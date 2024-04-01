@@ -35,6 +35,7 @@
     "@threlte/core": "^7.2.1",
     "@threlte/extras": "^8.11.1",
     "@types/three": "^0.163.0",
+    "lil-gui": "^0.19.2",
     "three": "^0.163.0"
   }
 }

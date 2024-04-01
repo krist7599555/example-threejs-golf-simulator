@@ -6,5 +6,8 @@
     "**/.svn": false,
     "**/.hg": false,
     "**/CVS": false
+  },
+  "[shellscript]": {
+    "editor.defaultFormatter": "foxundermoon.shell-format"
   }
 }

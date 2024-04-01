@@ -22,10 +22,13 @@ import {
   SphereGeometry,
   SkinnedMesh,
   Bone,
-  DirectionalLight
+  DirectionalLight,
+  LoadingManager
 } from 'three';
 import { ViewHelper } from 'three/addons/helpers/ViewHelper.js';
-import { OrbitControls } from 'three/examples/jsm/Addons.js';
+import { DRACOLoader, OrbitControls } from 'three/examples/jsm/Addons.js';
+import dracoDecoderWasmUrl from 'three/examples/jsm/libs/draco/draco_decoder.wasm?url';
+import dracoWasmWrapperJsUrl from 'three/examples/jsm/libs/draco/draco_wasm_wrapper.js?url';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import Stats from 'three/examples/jsm/libs/stats.module.js';
@@ -137,11 +140,22 @@ $effect(() => {
   onWindowResize();
   animate();
 
+  const loadingManager = new LoadingManager();
+  loadingManager.resolveURL = url => {
+    console.log('resolveURL', url);
+    if (url === 'draco_wasm_wrapper.js') return dracoWasmWrapperJsUrl;
+    if (url === 'draco_decoder.wasm') return dracoDecoderWasmUrl;
+
+    return url;
+  };
   const fbxLoader = new FBXLoader();
   const gltfLoader = new GLTFLoader();
+  const dracoLoader = new DRACOLoader(loadingManager);
+
+  gltfLoader.dracoLoader = dracoLoader;
   const textureLoader = new TextureLoader();
 
-  fbxLoader.loadAsync('models/ty-full.fbx').then(async boy => {
+  fbxLoader.loadAsync('/models/mixamo-ty-golf_drive.fbx').then(async boy => {
     boy.castShadow = true;
     boy.receiveShadow = true;
     boy.rotateY(degToRad(180));
@@ -167,11 +181,8 @@ $effect(() => {
     scene.add(boy);
     // scene.add(new SkeletonHelper(boy));
 
-    return gltfLoader.loadAsync('models/golf-club-iron.glb').then(gltf => {
+    return gltfLoader.loadAsync('/models/sketchfab-golf_club_iron.glb').then(gltf => {
       const club = gltf.scene;
-
-      // club.add(new Mesh(new SphereGeometry(1, 10, 10), material));
-
       const clubGui = gui.addFolder('Club');
 
       const handLeft = boy.getObjectByName('mixamorigLeftHand')! as Bone;
@@ -229,7 +240,7 @@ $effect(() => {
       Promise.all(
         // ['px', 'nx', 'py', 'ny', 'pz', 'nz']
         ['ft', 'bk', 'up', 'dn', 'rt', 'lf']
-          .map(side => `models/skybox-elyvisions/${theme}_${side}.png`)
+          .map(side => `models/opengameart-skybox_elyvisions/${theme}_${side}.png`)
           .map(url => textureLoader.loadAsync(url))
       )
 
@@ -246,7 +257,7 @@ $effect(() => {
     })
     .setValue('rainbow');
 
-  gltfLoader.loadAsync('/models/world-golfplatz-big.glb').then(world => {
+  gltfLoader.loadAsync('/models/sketchfab-golfplatz-optimize.glb').then(world => {
     const golfField = world.scene;
     golfField.rotation.y = -0.6;
     golfField.rotation.x = 0.05;

@@ -10,3 +10,10 @@ lil-gui
 webgl-skydiving
 <https://webgl-skydiving.vercel.app/>
 <https://github.com/sebastien-lempens/webgl-skydiving>
+
+## Model
+
+- sketchfab | golfplatz <https://sketchfab.com/3d-models/golfplatz-f7531e36db6a49d5b46d667b9aad8d4a>
+- sketchfab | glof club iron <https://sketchfab.com/3d-models/golf-club-iron-dc748ddd268c4acab25c54c4048b3912>
+- opengameart | skybox_elyvisions <https://opengameart.org/content/elyvisions-skyboxes>
+- mixamo | ty-golf_drive <https://www.mixamo.com/#/?query=ty&type=Character>

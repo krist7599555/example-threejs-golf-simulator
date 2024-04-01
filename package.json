@@ -9,7 +9,8 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "lint": "prettier --check . && eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "model:optimize": "bash ./scripts/optimizemodels.sh"
   },
   "devDependencies": {
     "@gltf-transform/cli": "^3.10.1",
@@ -19,12 +20,12 @@
     "@sveltejs/kit": "^2.0.0",
     "@sveltejs/vite-plugin-svelte": "^3.0.0",
     "@types/eslint": "^8.56.0",
+    "@types/three": "^0.163.0",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "eslint": "^8.56.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-svelte": "^2.36.0-next.4",
-    "meshoptimizer": "^0.20.0",
     "prettier": "^3.1.1",
     "prettier-plugin-svelte": "^3.1.2",
     "svelte": "^5.0.0-next.1",
@@ -36,10 +37,8 @@
   "type": "module",
   "dependencies": {
     "@mobily/ts-belt": "^3.13.1",
-    "@threlte/core": "^7.2.1",
-    "@threlte/extras": "^8.11.1",
-    "@types/three": "^0.163.0",
     "lil-gui": "^0.19.2",
+    "svelte-meta-tags": "^3.1.1",
     "three": "^0.163.0"
   }
 }

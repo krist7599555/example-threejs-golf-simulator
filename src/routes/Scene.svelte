@@ -1,29 +1,21 @@
 <script lang="ts">
 import {
   Scene,
-  AxesHelper,
   PerspectiveCamera,
   AmbientLight,
   WebGLRenderer,
   Mesh,
   MeshBasicMaterial,
-  MeshNormalMaterial,
   AnimationMixer,
   Object3D,
   Clock,
   TextureLoader,
-  Vector3,
   BackSide,
   BoxGeometry,
-  Box3,
   Group,
-  EventDispatcher,
-  SkeletonHelper,
-  SphereGeometry,
-  SkinnedMesh,
   Bone,
-  DirectionalLight,
-  LoadingManager
+  LoadingManager,
+  Euler
 } from 'three';
 import { ViewHelper } from 'three/addons/helpers/ViewHelper.js';
 import { DRACOLoader, OrbitControls } from 'three/examples/jsm/Addons.js';
@@ -35,47 +27,50 @@ import Stats from 'three/examples/jsm/libs/stats.module.js';
 
 import { pipe, F } from '@mobily/ts-belt';
 import { degToRad } from 'three/src/math/MathUtils.js';
-import { mix } from 'three/examples/jsm/nodes/Nodes.js';
 import { untrack } from 'svelte';
 import GUI from 'lil-gui';
-import type { AnymatchFn } from 'vite';
 
-console.log('Scene');
+// PROPS
 
-const { tap } = F;
 let { canvas }: { canvas: HTMLCanvasElement } = $props();
 
-const gui = new GUI();
-const debugGui = gui.addFolder('Debug');
-const debugParam = $state({
-  fps: true,
-  axes: true
-});
-debugGui.add(debugParam, 'fps').name('fps');
-debugGui.add(debugParam, 'axes').name('axes');
+// HELPER FUNCTION
+
+const { tap } = F;
 
 const isMesh = <T,>(obj: T): obj is T & Mesh => {
   return (obj as any).isMesh;
 };
+
+const addTo =
+  <T extends Object3D>(parent: T) =>
+  <C extends Object3D>(obj: C): C => {
+    parent.add(obj);
+    return obj;
+  };
+
+// VARIABLE
+
+let animationMixer: AnimationMixer | undefined = undefined;
+let debugParam = $state({ fps: true, axes: true });
+
+const gui = new GUI();
+const _debugGui = tap(gui.addFolder('Debug'), _ => {
+  _.add(debugParam, 'fps').name('fps');
+  _.add(debugParam, 'axes').name('axes');
+});
+
+const clock = new Clock();
+const stats = new Stats();
 const scene = new Scene();
-const sceneAdd = <T extends Object3D>(obj: T) => {
-  scene.add(obj);
-  return obj;
-};
-
-const directionalLight = new DirectionalLight(0xff0000, 0);
-
-sceneAdd(directionalLight);
-// const light = pipe(
-//   new PointLight(0xffffff, 10),
-//   tap(_ => _.position.set(0.8, 1.4, 1.0)),
-//   sceneAdd
-// );
-
-// sceneAdd(new AxesHelper(5));
-
-const ambientLight = pipe(new AmbientLight(0xffffff, 3), sceneAdd);
-
+const ambientLight = pipe(new AmbientLight(0xffffff, 3), addTo(scene));
+const renderer = pipe(
+  new WebGLRenderer({ canvas, antialias: true }),
+  tap(_ => {
+    _.setClearColor(0xffffff);
+    _.autoClear = false;
+  })
+);
 const camera = pipe(
   new PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 3000),
   tap(_ => {
@@ -84,19 +79,21 @@ const camera = pipe(
   })
 );
 const viewHelper = new ViewHelper(camera, canvas);
-
-const renderer = new WebGLRenderer({ canvas, antialias: true });
-renderer.setClearColor(0xffffff);
-renderer.autoClear = false;
 const controls = pipe(
   new OrbitControls(camera, canvas),
   tap(_ => {
-    _.enableDamping = true;
     _.target.set(0, 1, 0);
+    _.enableDamping = true;
   })
 );
 
-const material = new MeshNormalMaterial();
+// REACTIVE
+
+$effect(() => {
+  stats.dom.style.display = debugParam.fps ? 'block' : 'none';
+});
+
+// EVENT_HANDLE
 
 function render() {
   renderer.clear();
@@ -107,6 +104,7 @@ function render() {
     }
   });
 }
+
 function onWindowResize() {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
@@ -114,173 +112,141 @@ function onWindowResize() {
   render();
 }
 
-const stats = new Stats();
-let mixer: AnimationMixer;
-
-const clock = new Clock();
-const eventDispatcher = new EventDispatcher<{ render: { delta: number } }>();
+// loop self call recursive
 function animate() {
   requestAnimationFrame(animate);
   const delta = clock.getDelta();
-  eventDispatcher.dispatchEvent({ type: 'render', delta });
   controls.update();
-  if (mixer) mixer.update(delta);
+  animationMixer?.update(delta);
   render();
   stats.update();
 }
 
+// ON_MOUNT
+
 $effect(() => {
-  stats.dom.style.display = debugParam.fps ? 'block' : 'none';
-});
-console.log('INIT');
-$effect(() => {
-  console.log('EFFECT');
   window.addEventListener('resize', onWindowResize, false);
   document.body.appendChild(stats.dom);
   onWindowResize();
   animate();
 
-  const loadingManager = new LoadingManager();
-  loadingManager.resolveURL = url => {
-    console.log('resolveURL', url);
-    if (url === 'draco_wasm_wrapper.js') return dracoWasmWrapperJsUrl;
-    if (url === 'draco_decoder.wasm') return dracoDecoderWasmUrl;
+  const loadingManager = tap(new LoadingManager(), _ => {
+    _.resolveURL = url => {
+      if (url === 'draco_wasm_wrapper.js') return dracoWasmWrapperJsUrl;
+      if (url === 'draco_decoder.wasm') return dracoDecoderWasmUrl;
+      return url;
+    };
+  });
+  const fbxLoader = new FBXLoader(loadingManager);
+  const gltfLoader = new GLTFLoader(loadingManager).setDRACOLoader(new DRACOLoader(loadingManager));
+  const textureLoader = new TextureLoader(loadingManager);
 
-    return url;
-  };
-  const fbxLoader = new FBXLoader();
-  const gltfLoader = new GLTFLoader();
-  const dracoLoader = new DRACOLoader(loadingManager);
+  Promise.all([
+    fbxLoader.loadAsync('/models/mixamo-ty-golf_drive.fbx'),
+    gltfLoader.loadAsync('/models/sketchfab-golf_club_iron.glb')
+  ]).then(([boy, { scene: club }]) => {
+    boy = pipe(
+      boy,
+      addTo(scene),
+      tap(_ => {
+        _.scale.set(0.01, 0.01, 0.01);
+        _.castShadow = true;
+        _.receiveShadow = true;
+        _.rotateY(degToRad(180));
+        _.position.x = -0.5;
+      })
+    );
+    const boyHandLeft = boy.getObjectByName('mixamorigLeftHand')! as Bone;
+    const clubWrapper = pipe(
+      new Group(),
+      addTo(boyHandLeft),
+      tap(_ => {
+        _.scale.setScalar(130);
+        _.setRotationFromEuler(new Euler(degToRad(180), degToRad(180), degToRad(40), 'YZX'));
+        _.position.setY(10);
+      })
+    );
 
-  gltfLoader.dracoLoader = dracoLoader;
-  const textureLoader = new TextureLoader();
+    club = pipe(
+      club,
+      addTo(clubWrapper),
+      tap(_ => {
+        _.position.set(0.3, 0.05, 0);
+        _.rotateZ(degToRad(6));
+      })
+    );
 
-  fbxLoader.loadAsync('/models/mixamo-ty-golf_drive.fbx').then(async boy => {
-    boy.castShadow = true;
-    boy.receiveShadow = true;
-    boy.rotateY(degToRad(180));
-    boy.traverse(child => {
-      if (isMesh(child)) {
-        child.castShadow = true;
-        child.receiveShadow = true;
-      }
+    // Swing Animatio
+    animationMixer = new AnimationMixer(boy);
+    const swingAnimation = animationMixer.clipAction(boy.animations[0]).setDuration(10);
+    swingAnimation.play();
+
+    // GUI
+    const _boyGui = tap(gui.addFolder('Boy'), _ => {
+      _.add(boy.position, 'x').name('x');
+      _.add(boy.position, 'y').name('y');
+      _.add(boy.position, 'z').name('z');
+      _.add(boy.rotation, 'y', -Math.PI, Math.PI).name('rotation');
     });
-    boy.position.x = -0.5;
-    const boyGui = gui.addFolder('Boy');
-    boyGui.add(boy.position, 'x').name('x');
-    boyGui.add(boy.position, 'y').name('y');
-    boyGui.add(boy.position, 'z').name('z');
-    boyGui.add(boy.rotation, 'y', -Math.PI, Math.PI).name('rotation');
-
-    boy.scale.set(0.01, 0.01, 0.01);
-
-    mixer = new AnimationMixer(boy);
-    const anim1 = mixer.clipAction(boy.animations[0]);
-    anim1.play();
-    anim1.setDuration(10);
-    scene.add(boy);
-    // scene.add(new SkeletonHelper(boy));
-
-    return gltfLoader.loadAsync('/models/sketchfab-golf_club_iron.glb').then(gltf => {
-      const club = gltf.scene;
-      const clubGui = gui.addFolder('Club');
-
-      const handLeft = boy.getObjectByName('mixamorigLeftHand')! as Bone;
-      const handRight = boy.getObjectByName('mixamorigRightHand')! as Bone;
-
-      // handLeft.add(club);
-      club.position.set(0.3, 0.05, 0);
-      club.rotateZ(degToRad(6));
-      // club.rotateZ(degToRad(6));
-      const club2 = new Group();
-      club2.add(club);
-      club2.scale.setScalar(130);
-      club2.rotateY(degToRad(180));
-      club2.rotateZ(degToRad(40));
-      club2.rotateX(degToRad(180));
-      club2.position.y = 10;
-      clubGui
-        .add(club2.scale, 'x')
+    const _clubGui = tap(gui.addFolder('Club'), _ => {
+      _.add(clubWrapper.scale, 'x')
         .name('scale')
         .step(1)
-        .onChange((s: number) => {
-          club2.scale.setScalar(s);
-        });
-      clubGui.add(club2.position, 'x');
-      clubGui.add(club2.position, 'y');
-      clubGui.add(club2.position, 'z');
-      handLeft.add(club2);
-      console.log({ handLeft, handRight });
-
-      // club.position.set(0, 0, 0);
-      return gltf;
+        .onChange((s: number) => clubWrapper.scale.setScalar(s));
+      _.add(clubWrapper.position, 'x');
+      _.add(clubWrapper.position, 'y');
+      _.add(clubWrapper.position, 'z');
     });
   });
 
-  const skyGui = gui.addFolder('Sky');
-  const skyMesh = new Mesh(new BoxGeometry(1500, 1500, 1500), [] as MeshBasicMaterial[]);
-  scene.add(skyMesh);
-  skyGui
-    .add({ theme: 'hot' }, 'theme', [
-      'arch3',
-      'cave3',
-      'dark',
-      'hot',
-      'rainbow',
-      'sh',
-      'skyast',
-      'skyhsky',
-      'skype',
-      'sp2',
-      'sp3',
-      'tron'
-    ])
-    .onChange((theme: string) => {
-      console.log({ theme });
-      Promise.all(
-        // ['px', 'nx', 'py', 'ny', 'pz', 'nz']
-        ['ft', 'bk', 'up', 'dn', 'rt', 'lf']
-          .map(side => `models/opengameart-skybox_elyvisions/${theme}_${side}.png`)
-          .map(url => textureLoader.loadAsync(url))
-      )
-
-        .then(textures =>
-          textures.map(texture => new MeshBasicMaterial({ map: texture, side: BackSide }))
-        )
-        .then(materials => {
-          skyMesh.material = materials;
-          skyMesh.rotateY(2.9);
-          skyMesh.position.y = 38;
-          skyGui.add(skyMesh.rotation, 'y', -Math.PI, Math.PI, 0.1).name('rotate');
-          skyGui.add(skyMesh.position, 'y').name('y');
-        });
+  const skyMesh = pipe(
+    new Mesh(new BoxGeometry(1500, 1500, 1500), [] as MeshBasicMaterial[]),
+    addTo(scene),
+    tap(_ => {
+      _.rotateY(2.9);
+      _.position.y = 38;
     })
-    .setValue('rainbow');
+  );
 
-  gltfLoader.loadAsync('/models/sketchfab-golfplatz-optimize.glb').then(world => {
-    const golfField = world.scene;
-    golfField.rotation.y = -0.6;
-    golfField.rotation.x = 0.05;
-    golfField.position.set(40, 78.65, 120);
-    golfField.scale.setScalar(2);
-    golfField.traverse(child => {
-      if (isMesh(child)) {
-        child.castShadow = true;
-        child.receiveShadow = true;
-      }
+  const _skyGui = tap(gui.addFolder('Sky'), _ => {
+    // prettier-ignore
+    const ALL_SKY_THEMES = ['rainbow', 'arch3', 'cave3', 'dark', 'hot', 'rainbow', 'sh', 'skyast', 'skyhsky', 'skype', 'sp2', 'sp3', 'tron']
+    _.add(skyMesh.rotation, 'y', -Math.PI, Math.PI, 0.1).name('rotate');
+    _.add(skyMesh.position, 'y').name('y');
+    _.add(skyMesh, 'theme', ALL_SKY_THEMES)
+      .onChange(async (theme: string) => {
+        skyMesh.material = await Promise.all(
+          ['ft', 'bk', 'up', 'dn', 'rt', 'lf'].map(async side => {
+            const url = `models/opengameart-skybox_elyvisions/${theme}_${side}.png`;
+            const texture = await textureLoader.loadAsync(url);
+            return new MeshBasicMaterial({ map: texture, side: BackSide });
+          })
+        );
+      })
+      .setValue(ALL_SKY_THEMES[0]);
+  });
+
+  gltfLoader.loadAsync('/models/sketchfab-golfplatz-optimize.glb').then(({ scene: golfField }) => {
+    golfField = pipe(
+      golfField,
+      addTo(scene),
+      tap(_ => {
+        _.rotation.y = -0.6;
+        _.rotation.x = 0.05;
+        _.position.set(40, 78.65, 120);
+        _.scale.setScalar(2);
+      })
+    );
+    const _golfFieldGui = tap(gui.addFolder('GolfField'), _ => {
+      _.add(golfField.scale, 'x', 0.5, 3, 0.1)
+        .name('scale')
+        .onChange((s: number) => golfField.scale.setScalar(s));
+      _.add(golfField.rotation, 'y', -Math.PI, Math.PI, 0.1).name('rotate');
+      _.add(golfField.position, 'x').name('x');
+      _.add(golfField.position, 'y').name('y').step(0.1);
+      _.add(golfField.position, 'z').name('z');
     });
-    scene.add(golfField);
-
-    const golfFieldGui = gui.addFolder('GolfField');
-    golfFieldGui
-      .add(golfField.scale, 'x', 0.5, 3, 0.1)
-      .name('scale')
-      .onChange((s: number) => golfField.scale.setScalar(s));
-    golfFieldGui.add(golfField.rotation, 'y', -Math.PI, Math.PI, 0.1).name('rotate');
-    golfFieldGui.add(golfField.position, 'x').name('x');
-    golfFieldGui.add(golfField.position, 'y').name('y').step(0.1);
-    golfFieldGui.add(golfField.position, 'z').name('z');
-    return world;
+    return golfField;
   });
 });
 </script>

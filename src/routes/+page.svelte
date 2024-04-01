@@ -4,7 +4,7 @@ import { MetaTags } from 'svelte-meta-tags';
 
 let title = 'นักกอร์ฟหรรษา';
 let description = 'Interactive golf animation scene with Three.js';
-let ogimage = new URL('/ogimage.png', 'https://golfyboygolfyboy.pages.dev');
+let ogimage = new URL('/ogimage.png', 'https://golfyboy.krist7599555.com');
 
 let canvas = $state<HTMLCanvasElement>();
 let comp = $state<typeof import('./Scene.svelte').default>();

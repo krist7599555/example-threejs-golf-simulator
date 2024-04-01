@@ -143,7 +143,7 @@ $effect(() => {
 
   Promise.all([
     fbxLoader.loadAsync('/models/mixamo-ty-golf_drive.fbx'),
-    gltfLoader.loadAsync('/models/sketchfab-golf_club_iron.glb')
+    gltfLoader.loadAsync('/models/sketchfab-golf_club_iron-optimize.glb')
   ]).then(([boy, { scene: club }]) => {
     boy = pipe(
       boy,

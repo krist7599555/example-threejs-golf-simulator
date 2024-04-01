@@ -1,11 +1,10 @@
 <script lang="ts">
 import '../app.css';
-import { browser } from '$app/environment';
 import { MetaTags } from 'svelte-meta-tags';
 
 let title = 'นักกอร์ฟหรรษา';
 let description = 'Interactive golf animation scene with Three.js';
-let ogimage = new URL('/ogimage.png', 'https://golfyboy.pages.dev');
+let ogimage = new URL('/ogimage.png', 'https://golfyboygolfyboy.pages.dev');
 
 let canvas = $state<HTMLCanvasElement>();
 let comp = $state<typeof import('./Scene.svelte').default>();
